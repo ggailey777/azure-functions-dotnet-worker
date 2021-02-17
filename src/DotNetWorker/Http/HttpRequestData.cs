@@ -19,7 +19,7 @@ namespace Microsoft.Azure.Functions.Worker
         public abstract ReadOnlyMemory<byte>? Body { get; }
 
         /// <summary>
-        /// Gets an <see cref="IImmutableDictionary{string, string}"/> containing the request headers.
+        /// Gets a <see cref="HttpHeadersCollection"/> containing the request headers.
         /// </summary>
         public abstract HttpHeadersCollection Headers { get; }
 
