@@ -10,7 +10,7 @@ namespace Microsoft.Azure.Functions.Worker.E2EApp
 {
     public static class BasicHttpFunctions
     {
-        [FunctionName(nameof(HelloFromQuery))]
+        [Function(nameof(HelloFromQuery))]
         public static HttpResponseData HelloFromQuery(
             [HttpTrigger(AuthorizationLevel.Anonymous, "get", "post", Route = null)] HttpRequestData req,
             FunctionContext context)
@@ -31,7 +31,7 @@ namespace Microsoft.Azure.Functions.Worker.E2EApp
             }
         }
 
-        [FunctionName(nameof(HelloFromJsonBody))]
+        [Function(nameof(HelloFromJsonBody))]
         public static HttpResponseData HelloFromJsonBody(
             [HttpTrigger(AuthorizationLevel.Anonymous, "get", "post", Route = null)] HttpRequestData req,
             FunctionContext context)

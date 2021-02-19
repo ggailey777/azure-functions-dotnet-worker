@@ -6,21 +6,19 @@ using System.Linq;
 using Microsoft.Azure.Functions.Worker.E2EApp.Cosmos;
 using Microsoft.Azure.Functions.Worker.Extensions.Abstractions;
 using Microsoft.Azure.Functions.Worker.Extensions.CosmosDB;
-using Microsoft.Azure.Functions.Worker.Pipeline;
 using Microsoft.Extensions.Logging;
 
 namespace Microsoft.Azure.Functions.Worker.E2EApp
 {
     public static class CosmosFunction
     {
-        [FunctionName("CosmosTrigger")]
+        [Function("CosmosTrigger")]
         [CosmosDBOutput(
-            name: "output",
             databaseName: "%CosmosDb%",
             collectionName: "%CosmosCollOut%",
             ConnectionStringSetting = "CosmosConnection",
             CreateIfNotExists = true)]
-        public static void Run([CosmosDBTrigger(
+        public static object Run([CosmosDBTrigger(
             databaseName: "%CosmosDb%",
             collectionName: "%CosmosCollIn%",
             ConnectionStringSetting = "CosmosConnection",
@@ -34,8 +32,10 @@ namespace Microsoft.Azure.Functions.Worker.E2EApp
                     context.GetLogger("Function.CosmosTrigger").LogInformation($"id: {doc.Id}");
                 }
 
-                context.OutputBindings["output"] = input.Select(p => new { id = p.Id });
+                return input.Select(p => new { id = p.Id });
             }
+
+            return null;
         }
     }
 }

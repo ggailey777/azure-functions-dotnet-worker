@@ -7,7 +7,7 @@ namespace Microsoft.Azure.Functions.Worker.E2EApp
 {
     public static class FailingHttpFunctions
     {
-        [FunctionName(nameof(ExceptionFunction))]
+        [Function(nameof(ExceptionFunction))]
         public static HttpResponseData ExceptionFunction(
             [HttpTrigger(AuthorizationLevel.Anonymous, "get", "post", Route = null)] HttpRequestData req,
             FunctionContext context)

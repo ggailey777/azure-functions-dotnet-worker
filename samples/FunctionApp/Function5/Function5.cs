@@ -6,7 +6,6 @@ using System.Net;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Extensions.Abstractions;
 using Microsoft.Azure.Functions.Worker.Extensions.Http;
-using Microsoft.Azure.Functions.Worker.Pipeline;
 using Microsoft.Extensions.Logging;
 
 namespace FunctionApp
@@ -22,7 +21,7 @@ namespace FunctionApp
             _logger = logger;
         }
 
-        [FunctionName(nameof(Function5))]
+        [Function(nameof(Function5))]
         public HttpResponseData Run([HttpTrigger(AuthorizationLevel.Anonymous, "get", "post", Route = null)] HttpRequestData req)
         {
             _logger.LogInformation("message logged");

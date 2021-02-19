@@ -15,8 +15,12 @@ namespace Microsoft.Azure.Functions.Worker.Sdk
     {
         private const string BindingType = "Microsoft.Azure.Functions.Worker.Extensions.Abstractions.BindingAttribute";
         private const string OutputBindingType = "Microsoft.Azure.Functions.Worker.Extensions.Abstractions.OutputBindingAttribute";
-        private const string FunctionNameType = "Microsoft.Azure.Functions.Worker.Extensions.Abstractions.FunctionNameAttribute";
+        private const string FunctionNameType = "Microsoft.Azure.Functions.Worker.Extensions.Abstractions.FunctionAttribute";
         private const string ExtensionsInformationType = "Microsoft.Azure.Functions.Worker.Extensions.Abstractions.ExtensionInformationAttribute";
+        private const string HttpResponseType = "Microsoft.Azure.Functions.Worker.HttpResponseData";
+        private const string TaskGenericType = "System.Threading.Tasks.Task`1";
+        private const string TaskType = "System.Threading.Tasks.Task";
+        private const string ReturnType = "FunctionsWorkerReturnReserved";
 
         private readonly IndentableLogger _logger;
 
@@ -101,7 +105,7 @@ namespace Microsoft.Azure.Functions.Worker.Sdk
 
             foreach (TypeDefinition type in module.Types)
             {
-                var functionsResult = GenerateFunctionMetadata(type).ToArray();
+                var functionsResult = GenerateFunctionMetadata(module,  type).ToArray();
                 if (functionsResult.Any())
                 {
                     _logger.LogMessage($"Found {functionsResult.Length} functions in '{type.GetReflectionFullName()}'.");
@@ -113,24 +117,24 @@ namespace Microsoft.Azure.Functions.Worker.Sdk
             return functions;
         }
 
-        internal IEnumerable<SdkFunctionMetadata> GenerateFunctionMetadata(TypeDefinition type)
+        internal IEnumerable<SdkFunctionMetadata> GenerateFunctionMetadata(ModuleDefinition module, TypeDefinition type)
         {
             var functions = new List<SdkFunctionMetadata>();
 
             foreach (MethodDefinition method in type.Methods)
             {
-                AddFunctionMetadataIfFunction(functions, method);
+                AddFunctionMetadataIfFunction(module, functions, method);
             }
 
             return functions;
         }
 
-        private void AddFunctionMetadataIfFunction(IList<SdkFunctionMetadata> functions, MethodDefinition method)
+        private void AddFunctionMetadataIfFunction(ModuleDefinition module, IList<SdkFunctionMetadata> functions, MethodDefinition method)
         {
             if (TryCreateFunctionMetadata(method, out SdkFunctionMetadata? metadata)
                 && metadata != null)
             {
-                var allBindings = CreateBindingMetadataAndAddExtensions(method);
+                var allBindings = CreateBindingMetadataAndAddExtensions(module, method);
 
                 foreach(var binding in allBindings)
                 {
@@ -186,26 +190,90 @@ namespace Microsoft.Azure.Functions.Worker.Sdk
             return function;
         }
 
-        private IEnumerable<ExpandoObject> CreateBindingMetadataAndAddExtensions(MethodDefinition method)
+        private IEnumerable<ExpandoObject> CreateBindingMetadataAndAddExtensions(ModuleDefinition module, MethodDefinition method)
         {
             var bindingMetadata = new List<ExpandoObject>();
 
             AddInputTriggerBindingsAndExtensions(bindingMetadata, method);
-            AddOutputBindingsAndExtensions(bindingMetadata, method);
+            AddOutputBindingsAndExtensions(module, bindingMetadata, method);
 
             return bindingMetadata;
         }
 
-        private void AddOutputBindingsAndExtensions(IList<ExpandoObject> bindingMetadata, MethodDefinition method)
+        private void AddOutputBindingsAndExtensions(ModuleDefinition module, IList<ExpandoObject> bindingMetadata, MethodDefinition method)
         {
+            if (!TryAddOutputBindingFromMethod(bindingMetadata, method))
+            {
+                AddOutputBindingsFromReturnType(module, bindingMetadata, method);
+            }
+        }
+
+        private void AddOutputBindingsFromReturnType(ModuleDefinition module, IList<ExpandoObject> bindingMetadata, MethodDefinition method)
+        {
+            string? returnType = GetActualDataTypeOrNull(method.ReturnType);
+
+            if (returnType is not null)
+            {
+                if (returnType == HttpResponseType)
+                {
+                    AddHttpOutputBinding(bindingMetadata);
+                }
+                else
+                {
+                    TypeDefinition returnDefinition = module.GetType(returnType)
+                        ?? throw new InvalidOperationException($"Couldn't find the type definition {returnType}");
+
+                    foreach (PropertyDefinition property in returnDefinition.Properties)
+                    {
+                        AddOutputBindingFromProperty(bindingMetadata, property);
+                    }
+                }
+            }
+        }
+
+        private void AddOutputBindingFromProperty(IList<ExpandoObject> bindingMetadata, PropertyDefinition property)
+        {
+            foreach (CustomAttribute propertyAttribute in property.CustomAttributes)
+            {
+                if (IsOutputBindingType(propertyAttribute))
+                {
+                    AddOutputBindingMetadata(bindingMetadata, propertyAttribute, property.Name);
+                    AddExtensionInfo(_extensions, propertyAttribute);
+
+                    // Only 1 output binding per property
+                    return;
+                }
+            }
+
+            if (property.PropertyType.FullName == HttpResponseType)
+            {
+                AddHttpOutputBinding(bindingMetadata);
+            }
+        }
+
+        private bool TryAddOutputBindingFromMethod(IList<ExpandoObject> bindingMetadata, MethodDefinition method)
+        {
+            bool foundBinding = false;
+
             foreach (CustomAttribute methodAttribute in method.CustomAttributes)
             {
                 if (IsOutputBindingType(methodAttribute))
                 {
-                    AddOutputBindingMetadata(bindingMetadata, methodAttribute);
+                    if (foundBinding)
+                    {
+                        // TODO: Is this an exception? If so, throw with proper message
+                        throw new Exception($"Found multiple Output bindings on method '{method.FullName}'. " +
+                            $"Please use an encapsulation to define the bindings. For more information: github.com/Azure-Functions/azure-functions-dotnet-worker.");
+                    }
+
+                    AddOutputBindingMetadata(bindingMetadata, methodAttribute, ReturnType);
                     AddExtensionInfo(_extensions, methodAttribute);
+
+                    foundBinding = true;
                 }
             }
+
+            return foundBinding;
         }
 
         private void AddInputTriggerBindingsAndExtensions(IList<ExpandoObject> bindingMetadata, MethodDefinition method)
@@ -223,9 +291,28 @@ namespace Microsoft.Azure.Functions.Worker.Sdk
             }
         }
 
-        private static void AddOutputBindingMetadata(IList<ExpandoObject> bindingMetadata, CustomAttribute attribute)
+        private static string? GetActualDataTypeOrNull(TypeReference typeReference)
         {
-            AddBindingMetadata(bindingMetadata, attribute, parameterName: null);
+            if (typeReference is null || typeReference.FullName == TaskType)
+            {
+                return null;
+            }
+            if (typeReference.IsGenericInstance
+                && typeReference is GenericInstanceType genericType 
+                && typeReference.GetElementType().FullName == TaskGenericType)
+            {
+                // T from Task<T>
+                return genericType.GenericArguments[0].FullName;
+            }
+            else
+            {
+                return typeReference.FullName;
+            }
+        }
+
+        private static void AddOutputBindingMetadata(IList<ExpandoObject> bindingMetadata, CustomAttribute attribute, string? name = null)
+        {
+            AddBindingMetadata(bindingMetadata, attribute, parameterName: name);
         }
 
         private static void AddBindingMetadata(IList<ExpandoObject> bindingMetadata, CustomAttribute attribute, string? parameterName)
@@ -234,10 +321,6 @@ namespace Microsoft.Azure.Functions.Worker.Sdk
 
             ExpandoObject binding = BuildBindingMetadataFromAttribute(attribute, bindingType, parameterName);
             bindingMetadata.Add(binding);
-
-            // TODO: Fix $return detection
-            // auto-add a return type for http for now
-            AddHttpOutputBindingIfHttp(bindingMetadata, bindingType);
         }
 
         private static ExpandoObject BuildBindingMetadataFromAttribute(CustomAttribute attribute, string bindingType, string? parameterName)
@@ -266,7 +349,6 @@ namespace Microsoft.Azure.Functions.Worker.Sdk
         {
             var attributeType = attribute.AttributeType.Name;
 
-            // TODO: fix this if we continue to use "<>EventAttribute" (questionable)
             // TODO: Should "webjob type" be a property of the "worker types" and come from there?
             return attributeType
                     .Replace("TriggerAttribute", "Trigger")
@@ -274,17 +356,14 @@ namespace Microsoft.Azure.Functions.Worker.Sdk
                     .Replace("OutputAttribute", string.Empty);
         }
 
-        private static void AddHttpOutputBindingIfHttp(IList<ExpandoObject> bindingMetadata, string bindingType)
+        private static void AddHttpOutputBinding(IList<ExpandoObject> bindingMetadata)
         {
-            if (string.Equals(bindingType, "httptrigger", StringComparison.OrdinalIgnoreCase))
-            {
-                IDictionary<string, object> returnBinding = new ExpandoObject();
-                returnBinding["Name"] = "$return";
-                returnBinding["Type"] = "http";
-                returnBinding["Direction"] = "Out";
+            IDictionary<string, object> returnBinding = new ExpandoObject();
+            returnBinding["Name"] = "$return";
+            returnBinding["Type"] = "http";
+            returnBinding["Direction"] = "Out";
 
-                bindingMetadata.Add((ExpandoObject)returnBinding);
-            }
+            bindingMetadata.Add((ExpandoObject)returnBinding);
         }
 
         private static void AddExtensionInfo(IDictionary<string, string> extensions, CustomAttribute attribute)

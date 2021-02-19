@@ -6,25 +6,33 @@ using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Extensions.Abstractions;
 using Microsoft.Azure.Functions.Worker.Extensions.Http;
 using Microsoft.Azure.Functions.Worker.Extensions.Storage;
-using Microsoft.Azure.Functions.Worker.Pipeline;
 
 namespace FunctionApp
 {
     public static class Function3
     {
-
-        [FunctionName("Function3")]
-        [QueueOutput("name", "functionstesting2", Connection = "AzureWebJobsStorage")]
-        public static HttpResponseData Run([HttpTrigger(AuthorizationLevel.Anonymous, "get", "post", Route = null)] HttpRequestData req,
+        [Function("Function3")]
+        public static MyOutputType Run([HttpTrigger(AuthorizationLevel.Anonymous, "get", "post", Route = null)] HttpRequestData req,
             FunctionContext context)
         {
-            var response = new HttpResponseData(HttpStatusCode.OK);
-            response.Body = "Success!!";
+            var response = new HttpResponseData(HttpStatusCode.OK)
+            {
+                Body = "Success!!"
+            };
 
-            context.OutputBindings["name"] = "some name";
-
-            return response;
+            return new MyOutputType()
+            {
+                Name = "some name",
+                HttpReponse = response
+            };
         }
     }
 
+    public class MyOutputType
+    {
+        [QueueOutput("functionstesting2", Connection = "AzureWebJobsStorage")]
+        public string Name { get; set; }
+
+        public HttpResponseData HttpReponse { get; set; }
+    }
 }
