@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See License.txt in the project root for license information.
 
 using System;
+using System.Net;
 using System.Text;
 
 namespace Microsoft.Azure.Functions.Worker.Http
@@ -26,6 +27,14 @@ namespace Microsoft.Azure.Functions.Worker.Http
             }
 
             return Encoding.UTF8.GetString(request.Body.Value.Span);
+        }
+
+        public static HttpResponseData CreateResponse(this HttpRequestData request, HttpStatusCode statusCode)
+        {
+            var response = request.CreateResponse();
+            response.StatusCode = statusCode;
+
+            return response;
         }
     }
 }

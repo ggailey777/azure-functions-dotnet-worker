@@ -4,9 +4,8 @@
 using System;
 using System.Collections.Generic;
 using System.Security.Claims;
-using Microsoft.Azure.Functions.Worker.Http;
 
-namespace Microsoft.Azure.Functions.Worker
+namespace Microsoft.Azure.Functions.Worker.Http
 {
     /// <summary>
     /// A representation of the HTTP request sent by the host.
@@ -42,5 +41,11 @@ namespace Microsoft.Azure.Functions.Worker
         /// Gets the HTTP method for this request.
         /// </summary>
         public abstract string Method { get; }
+
+        /// <summary>
+        /// Creates a response for this request.
+        /// </summary>
+        /// <returns>The response instance.</returns>
+        public abstract HttpResponseData CreateResponse();
     }
 }

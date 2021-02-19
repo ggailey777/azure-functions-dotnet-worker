@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Web;
 using Microsoft.Azure.Functions.Worker.Extensions.Abstractions;
 using Microsoft.Azure.Functions.Worker.Extensions.Http;
+using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Azure.Functions.Worker.Pipeline;
 using Microsoft.Extensions.Logging;
 
@@ -23,13 +24,13 @@ namespace Microsoft.Azure.Functions.Worker.E2EApp
             
             if (!string.IsNullOrEmpty(queryName))
             {
-                var response = new HttpResponseData(HttpStatusCode.OK);
-                response.Body = "Hello " + queryName;
+                var response = req.CreateResponse(HttpStatusCode.OK);
+                response.WriteString("Hello " + queryName);
                 return response;
             }
             else
             {
-                return new HttpResponseData(HttpStatusCode.BadRequest);
+                return req.CreateResponse(HttpStatusCode.BadRequest);
             }
         }
 
@@ -44,13 +45,13 @@ namespace Microsoft.Azure.Functions.Worker.E2EApp
             if (!string.IsNullOrEmpty(body))
             {
                 var serliazedBody = (CallerName)JsonSerializer.Deserialize(body, typeof(CallerName));
-                var response = new HttpResponseData(HttpStatusCode.OK);
-                response.Body = "Hello " + serliazedBody.Name;
+                var response = req.CreateResponse(HttpStatusCode.OK);
+                response.WriteString("Hello " + serliazedBody.Name);
                 return response;
             }
             else
             {
-                return new HttpResponseData(HttpStatusCode.BadRequest);
+                return req.CreateResponse(HttpStatusCode.BadRequest);
             }
         }
         

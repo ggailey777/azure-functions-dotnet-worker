@@ -68,5 +68,10 @@ namespace Microsoft.Azure.Functions.Worker
         }
 
         public override string Method => _httpData.Method;
+
+        public override HttpResponseData CreateResponse()
+        {
+            return new GrpcHttpResponseData(System.Net.HttpStatusCode.OK);
+        }
     }
 }

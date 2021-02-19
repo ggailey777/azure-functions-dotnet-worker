@@ -73,7 +73,7 @@ namespace Microsoft.Azure.Functions.Worker
                 }
                 if (result != null)
                 {
-                    var returnVal = result.ToRpc();
+                    var returnVal = await result.ToRpcAsync();
 
                     response.ReturnValue = returnVal;
                 }

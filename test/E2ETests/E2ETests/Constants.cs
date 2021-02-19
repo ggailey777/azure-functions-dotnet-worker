@@ -22,7 +22,7 @@ namespace Microsoft.Azure.Functions.Tests.E2ETests
         public static class CosmosDB
         {
             public static string EmulatorConnectionString = "AccountEndpoint=https://localhost:8081/;AccountKey=C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw==";
-            public static string CosmosDBConnectionStringSetting = Configuration["AzureWebJobsCosmosDBConnectionString"] ?? EmulatorConnectionString;
+            public static string CosmosDBConnectionStringSetting = Configuration["AzureWebJobsCosmosDBConnectionStrings"] ?? EmulatorConnectionString;
             public static string DbName = "ItemDb";
             public static string InputCollectionName = "ItemCollectionIn";
             public static string OutputCollectionName = "ItemCollectionOut";
